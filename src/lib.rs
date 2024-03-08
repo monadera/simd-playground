@@ -42,27 +42,56 @@ impl Block for usize {
 }
 
 #[cfg(feature = "simd")]
-impl Block for std::simd::usizex8 {
-    const SIZE: usize = POINTER_WIDTH * 8;
+impl Block for std::simd::u64x4 {
+    const SIZE: usize = 64 * 4;
 
     fn zeros() -> Self {
-        std::simd::usizex8::splat(0)
+        std::simd::u64x4::splat(0)
     }
 
     fn ones() -> Self {
-        std::simd::usizex8::splat(usize::MAX)
+        std::simd::u64x4::splat(u64::MAX)
     }
 
     #[inline(always)]
     fn set(&mut self, idx: usize) {
-        let (lane, bit) = div_rem(idx, POINTER_WIDTH);
+        let (lane, bit) = div_rem(idx, 64);
         self[lane] |= 1 << bit;
     }
 
     #[inline(always)]
     fn get(&self, idx: usize) -> bool {
-        let (lane, bit) = div_rem(idx, POINTER_WIDTH);
+        let (lane, bit) = div_rem(idx, 64);
         let value = self[lane] & (1 << bit);
+
+        value != 0
+    }
+}
+
+#[cfg(feature = "wide")]
+impl Block for wide::u64x4 {
+    const SIZE: usize = 64 * 4;
+
+    fn zeros() -> Self {
+        Self::MIN
+    }
+
+    fn ones() -> Self {
+        Self::MAX
+    }
+
+    #[inline(always)]
+    fn set(&mut self, idx: usize) {
+        let (lane, bit) = div_rem(idx, 64);
+        let mut array = self.to_array();
+        array[lane] |= 1 << bit;
+        *self = Self::from(array)
+    }
+
+    #[inline(always)]
+    fn get(&self, idx: usize) -> bool {
+        let (lane, bit) = div_rem(idx, 64);
+        let value = self.to_array()[lane] & (1 << bit);
 
         value != 0
     }
@@ -172,13 +201,13 @@ mod tests {
     #[cfg(feature = "simd")]
     mod simd_tests {
         use crate::BitSet;
-        use std::simd::usizex8;
+        use std::simd::u64x4;
 
         #[test]
         fn test_union_of_ones_and_zeros() {
             let size = 1_000;
-            let p: BitSet<usizex8> = BitSet::zeros(size);
-            let r: BitSet<usizex8> = BitSet::ones(size);
+            let p: BitSet<u64x4> = BitSet::zeros(size);
+            let r: BitSet<u64x4> = BitSet::ones(size);
             let s = p | r;
 
             for i in 0..size {
@@ -189,8 +218,8 @@ mod tests {
         #[test]
         fn test_union_random_bits() {
             let size = 1_000;
-            let mut p: BitSet<usizex8> = BitSet::zeros(size);
-            let mut r: BitSet<usizex8> = BitSet::zeros(size);
+            let mut p: BitSet<u64x4> = BitSet::zeros(size);
+            let mut r: BitSet<u64x4> = BitSet::zeros(size);
             p.set(20);
             r.set(600);
             let s = p | r;

@@ -2,7 +2,6 @@
 
 use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion};
 use simd_playground::BitSet;
-use std::simd::usizex8;
 
 const N: usize = 1000_000;
 
@@ -21,11 +20,12 @@ fn bench_union_usize(c: &mut Criterion) {
     });
 }
 
-fn bench_union_usizex8(c: &mut Criterion) {
-    let s1: BitSet<usizex8> = BitSet::zeros(N);
-    let s2: BitSet<usizex8> = BitSet::ones(N);
+fn bench_union_simd(c: &mut Criterion) {
+    use std::simd::u64x4;
+    let s1: BitSet<u64x4> = BitSet::zeros(N);
+    let s2: BitSet<u64x4> = BitSet::ones(N);
 
-    c.bench_function("union with SIMD", |b| {
+    c.bench_function("union with std SIMD", |b| {
         b.iter_batched(
             || (s1.clone(), s2.clone()),
             |(x, y)| {
@@ -36,5 +36,26 @@ fn bench_union_usizex8(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, bench_union_usize, bench_union_usizex8);
+fn bench_union_wide(c: &mut Criterion) {
+    use wide::u64x4;
+    let s1: BitSet<u64x4> = BitSet::zeros(N);
+    let s2: BitSet<u64x4> = BitSet::ones(N);
+
+    c.bench_function("union with wide SIMD", |b| {
+        b.iter_batched(
+            || (s1.clone(), s2.clone()),
+            |(x, y)| {
+                black_box(x | y);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+criterion_group!(
+    benches,
+    bench_union_usize,
+    bench_union_simd,
+    bench_union_wide
+);
 criterion_main!(benches);

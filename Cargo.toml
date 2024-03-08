@@ -5,9 +5,11 @@ edition = "2021"
 
 [features]
 simd = []
+wide = ["dep:wide"]
 
 [dependencies]
 itertools = "0.12"
+wide = { version = "0.7", optional = true }
 
 [dev-dependencies]
 criterion = "0.5"
