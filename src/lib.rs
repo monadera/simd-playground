@@ -123,6 +123,7 @@ impl<B: Block> BitSet<B> {
         }
     }
 
+    #[inline(always)]
     pub fn set(&mut self, idx: usize) {
         let (block_idx, bit_idx) = div_rem(idx, B::SIZE);
         if let Some(block) = self.data.get_mut(block_idx) {
@@ -132,6 +133,7 @@ impl<B: Block> BitSet<B> {
         }
     }
 
+    #[inline(always)]
     pub fn get(&self, idx: usize) -> bool {
         let (block_idx, bit_idx) = div_rem(idx, B::SIZE);
         if let Some(block) = self.data.get(block_idx) {
