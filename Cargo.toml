@@ -8,3 +8,10 @@ simd = []
 
 [dependencies]
 itertools = "0.12"
+
+[dev-dependencies]
+criterion = "0.5"
+
+[[bench]]
+name = "benchmark"
+harness = false
