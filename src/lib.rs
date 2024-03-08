@@ -1,3 +1,5 @@
+#![cfg_attr(feature = "simd", feature(portable_simd))]
+
 use itertools::{EitherOrBoth, Itertools};
 use std::ops::BitOr;
 
@@ -5,6 +7,11 @@ use std::ops::BitOr;
 pub struct BitSet<B> {
     data: Vec<B>,
 }
+
+#[cfg(target_pointer_width = "32")]
+const POINTER_WIDTH: usize = 32;
+#[cfg(target_pointer_width = "64")]
+const POINTER_WIDTH: usize = 64;
 
 pub trait Block: Clone + Sized + BitOr<Output = Self> {
     const SIZE: usize;
@@ -15,10 +22,7 @@ pub trait Block: Clone + Sized + BitOr<Output = Self> {
 }
 
 impl Block for usize {
-    #[cfg(target_pointer_width = "32")]
-    const SIZE: usize = 32;
-    #[cfg(target_pointer_width = "64")]
-    const SIZE: usize = 64;
+    const SIZE: usize = POINTER_WIDTH;
 
     fn zeros() -> Self {
         0
@@ -34,6 +38,33 @@ impl Block for usize {
 
     fn get(&self, idx: usize) -> bool {
         self & (1 << idx) != 0
+    }
+}
+
+#[cfg(feature = "simd")]
+impl Block for std::simd::usizex8 {
+    const SIZE: usize = POINTER_WIDTH * 8;
+
+    fn zeros() -> Self {
+        std::simd::usizex8::splat(0)
+    }
+
+    fn ones() -> Self {
+        std::simd::usizex8::splat(usize::MAX)
+    }
+
+    #[inline(always)]
+    fn set(&mut self, idx: usize) {
+        let (lane, bit) = div_rem(idx, POINTER_WIDTH);
+        self[lane] |= 1 << bit;
+    }
+
+    #[inline(always)]
+    fn get(&self, idx: usize) -> bool {
+        let (lane, bit) = div_rem(idx, POINTER_WIDTH);
+        let value = self[lane] & (1 << bit);
+
+        value != 0
     }
 }
 
@@ -109,29 +140,64 @@ impl<B: Clone + Block> From<Vec<B>> for BitSet<B> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    mod usize_tests {
+        use crate::BitSet;
+        #[test]
+        fn test_union_of_ones_and_zeros() {
+            let size = 1_000;
+            let p: BitSet<usize> = BitSet::zeros(size);
+            let r: BitSet<usize> = BitSet::ones(size);
+            let s = p | r;
 
-    #[test]
-    fn test_union_of_ones_and_zeros() {
-        let p: BitSet<usize> = BitSet::zeros(500);
-        let r: BitSet<usize> = BitSet::ones(500);
-        let s = p | r;
+            for i in 0..size {
+                assert_eq!(s.get(i), true);
+            }
+        }
 
-        for i in 0..500 {
-            assert_eq!(s.get(i), true);
+        #[test]
+        fn test_union_random_bits() {
+            let size = 1_000;
+            let mut p: BitSet<usize> = BitSet::zeros(size);
+            let mut r: BitSet<usize> = BitSet::zeros(size);
+            p.set(20);
+            r.set(600);
+            let s = p | r;
+
+            for i in 0..size {
+                assert_eq!(s.get(i), i == 20 || i == 600);
+            }
         }
     }
 
-    #[test]
-    fn test_union_random_bits() {
-        let mut p: BitSet<usize> = BitSet::zeros(500);
-        let mut r: BitSet<usize> = BitSet::zeros(500);
-        p.set(20);
-        r.set(400);
-        let s = p | r;
+    #[cfg(feature = "simd")]
+    mod simd_tests {
+        use crate::BitSet;
+        use std::simd::usizex8;
 
-        for i in 0..500 {
-            assert_eq!(s.get(i), i == 20 || i == 400);
+        #[test]
+        fn test_union_of_ones_and_zeros() {
+            let size = 1_000;
+            let p: BitSet<usizex8> = BitSet::zeros(size);
+            let r: BitSet<usizex8> = BitSet::ones(size);
+            let s = p | r;
+
+            for i in 0..size {
+                assert_eq!(s.get(i), true);
+            }
+        }
+
+        #[test]
+        fn test_union_random_bits() {
+            let size = 1_000;
+            let mut p: BitSet<usizex8> = BitSet::zeros(size);
+            let mut r: BitSet<usizex8> = BitSet::zeros(size);
+            p.set(20);
+            r.set(600);
+            let s = p | r;
+
+            for i in 0..size {
+                assert_eq!(s.get(i), i == 20 || i == 600);
+            }
         }
     }
 }

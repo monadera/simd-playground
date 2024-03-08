@@ -3,5 +3,8 @@ name = "simd-playground"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+simd = []
+
 [dependencies]
 itertools = "0.12"
