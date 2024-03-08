@@ -123,7 +123,7 @@ impl<B: Block> BitSet<B> {
         }
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn set(&mut self, idx: usize) {
         let (block_idx, bit_idx) = div_rem(idx, B::SIZE);
         if let Some(block) = self.data.get_mut(block_idx) {
@@ -133,7 +133,7 @@ impl<B: Block> BitSet<B> {
         }
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn get(&self, idx: usize) -> bool {
         let (block_idx, bit_idx) = div_rem(idx, B::SIZE);
         if let Some(block) = self.data.get(block_idx) {
@@ -204,6 +204,38 @@ mod tests {
     mod simd_tests {
         use crate::BitSet;
         use std::simd::u64x4;
+
+        #[test]
+        fn test_union_of_ones_and_zeros() {
+            let size = 1_000;
+            let p: BitSet<u64x4> = BitSet::zeros(size);
+            let r: BitSet<u64x4> = BitSet::ones(size);
+            let s = p | r;
+
+            for i in 0..size {
+                assert_eq!(s.get(i), true);
+            }
+        }
+
+        #[test]
+        fn test_union_random_bits() {
+            let size = 1_000;
+            let mut p: BitSet<u64x4> = BitSet::zeros(size);
+            let mut r: BitSet<u64x4> = BitSet::zeros(size);
+            p.set(20);
+            r.set(600);
+            let s = p | r;
+
+            for i in 0..size {
+                assert_eq!(s.get(i), i == 20 || i == 600);
+            }
+        }
+    }
+
+    #[cfg(feature = "wide")]
+    mod wide_tests {
+        use crate::BitSet;
+        use wide::u64x4;
 
         #[test]
         fn test_union_of_ones_and_zeros() {
